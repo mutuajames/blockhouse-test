@@ -1,3 +1,10 @@
+"""
+Routes module.
+
+This module defines all the API endpoints related to orders.
+It handles order creation, retrieval, and status updates.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Dict, Set

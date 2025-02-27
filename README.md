@@ -22,7 +22,7 @@ A simple trading order management API built with FastAPI, PostgreSQL, Docker, an
 
 ### WebSocket API
 
-- `ws://host:port/ws/orders` - Connect to receive real-time order updates
+- `ws://host:port/ws/orders` - Connect to receive real-time order updates(No trailing slash)
 
 ## Getting Started
 
