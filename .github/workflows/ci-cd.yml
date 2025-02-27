@@ -1,0 +1,75 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Run tests
+        run: |
+          pytest
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
+      - name: Build and tag Docker image
+        run: |
+          docker build -t trading-api:latest .
+          docker save trading-api:latest > trading-api.tar
+          
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-image
+          path: trading-api.tar
+          
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Create app directory if it doesn't exist
+            mkdir -p ~/trading-api
+            
+            # Copy docker-compose file
+            scp ${{ github.workspace }}/docker-compose.yml ~/trading-api/
+            
+            # Stop running containers
+            cd ~/trading-api
+            docker-compose down || true
+            
+            # Load new image
+            docker load < trading-api.tar
+            
+            # Start containers
+            docker-compose up -d
+            
+            # Clean up old images
+            docker image prune -af
