@@ -1,3 +1,10 @@
+"""
+Main application module.
+
+This is the entry point of the FastAPI application.
+It configures the API, includes routers, and sets up WebSocket handlers.
+"""
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
@@ -32,12 +39,19 @@ app.include_router(orders.router, tags=["orders"])
 def read_root():
     return {"message": "Welcome to Trading API"}
 
-@app.get("/health")
-def health_check():
-    return {"status": "healthy"}
-
 @app.websocket("/ws/orders")
 async def websocket_orders(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time order updates.
+    
+    This endpoint allows clients to:
+    1. Connect and receive real-time order updates
+    2. Subscribe to specific trading symbols
+    3. Unsubscribe from specific trading symbols
+    
+    Args:
+        websocket: The WebSocket connection object
+    """
     await order_update_manager.connect(websocket)
     try:
         while True:
@@ -56,6 +70,7 @@ async def websocket_orders(websocket: WebSocket):
         print(f"WebSocket error: {e}")
         order_update_manager.disconnect(websocket)
 
+# If this file is executed directly, run the server
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

@@ -110,7 +110,7 @@ Connect to the WebSocket endpoint and send a JSON message to subscribe to specif
 ```json
 {
   "action": "subscribe",
-  "symbols": ["AAPL", "MSFT", "GOOGL"]
+  "symbols": ["AAPL", "MSFT", "GOOGLE"]
 }
 ```
 

@@ -108,7 +108,7 @@ def test_update_order_status(client):
     create_response = client.post(
         "/orders",
         json={
-            "symbol": "GOOGL",
+            "symbol": "GOOGLE",
             "price": 2500.0,
             "quantity": 2,
             "order_type": "MARKET"
