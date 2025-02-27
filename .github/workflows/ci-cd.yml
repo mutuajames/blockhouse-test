@@ -26,55 +26,56 @@ jobs:
         run: |
           pytest
 
-  build-and-deploy:
-    needs: test
+  deploy:
+    name: Deploy to EC2
+    needs: test  # Only run if tests pass
     runs-on: ubuntu-latest
+    # Only run on pushes to main branch (not on PRs)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
       - uses: actions/checkout@v3
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        
-      - name: Build and tag Docker image
-        run: |
-          docker build -t trading-api:latest .
-          docker save trading-api:latest > trading-api.tar
-          
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-image
-          path: trading-api.tar
-          
-      # Deploy to EC2 using SSH and SCP
       - name: Deploy to EC2
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "trading-api.tar,docker-compose.yml"
-          target: "~/trading-api"
-          
-      - name: Execute deployment commands on EC2
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
+        env:
+          PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          HOSTNAME: ${{ secrets.EC2_HOST }}
+          USER_NAME: ${{ secrets.EC2_USERNAME }}
+        
+        run: |
+          echo "$PRIVATE_KEY" > private_key && chmod 400 private_key
+          ssh -o StrictHostKeyChecking=no -i private_key ${USER_NAME}@${HOSTNAME} '
+            # Create app directory if it doesn't exist
+            mkdir -p ~/trading-api
+            
+            # Navigate to project directory
             cd ~/trading-api
             
-            # Stop running containers
-            docker-compose down || true
+            # Check if git repo is already initialized
+            if [ ! -d .git ]; then
+              git init
+              git remote add origin https://github.com/mutuajames/blockhouse-test.git
+            fi
             
-            # Load new image
-            docker load < trading-api.tar
+            # Fetch latest code from main branch
+            git fetch --all
+            git reset --hard origin/main
+            git pull origin main
             
-            # Start containers
-            docker-compose up -d
+            # Install dependencies
+            pip install -r requirements.txt
             
-            # Clean up old images
-            docker image prune -af
+            # If using Docker, build and run the container
+            if [ -f Dockerfile ]; then
+              docker build -t trading-api:latest .
+              
+              # Stop and remove any existing container
+              docker stop trading-api-container || true
+              docker rm trading-api-container || true
+              
+              # Run the new container
+              docker run -d --name trading-api-container -p 8000:8000 trading-api:latest
+            fi
+            
+            echo "Deployment completed successfully"
+          '
