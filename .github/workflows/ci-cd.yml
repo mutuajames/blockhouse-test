@@ -48,21 +48,26 @@ jobs:
           name: docker-image
           path: trading-api.tar
           
+      # Deploy to EC2 using SSH and SCP
       - name: Deploy to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "trading-api.tar,docker-compose.yml"
+          target: "~/trading-api"
+          
+      - name: Execute deployment commands on EC2
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Create app directory if it doesn't exist
-            mkdir -p ~/trading-api
-            
-            # Copy docker-compose file
-            scp ${{ github.workspace }}/docker-compose.yml ~/trading-api/
+            cd ~/trading-api
             
             # Stop running containers
-            cd ~/trading-api
             docker-compose down || true
             
             # Load new image
